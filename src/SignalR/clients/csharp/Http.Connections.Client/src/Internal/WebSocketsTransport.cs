@@ -591,7 +591,7 @@ internal sealed partial class WebSocketsTransport : ITransport, IStatefulReconne
 
             if (_gracefulClose)
             {
-                _application.Input.Complete(error);
+                _application.Input.Complete();
             }
             else
             {

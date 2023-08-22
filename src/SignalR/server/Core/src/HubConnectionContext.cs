@@ -266,7 +266,7 @@ public partial class HubConnectionContext
         {
             if (UsingStatefulReconnect())
             {
-                return _messageBuffer.WriteAsync(new SerializedHubMessage(message), cancellationToken);
+                return _messageBuffer.WriteAsync(message, cancellationToken);
             }
             else
             {
@@ -587,7 +587,7 @@ public partial class HubConnectionContext
                                 if (_connectionContext.Features.Get<IStatefulReconnectFeature>() is IStatefulReconnectFeature feature)
                                 {
                                     _useStatefulReconnect = true;
-                                    _messageBuffer = new MessageBuffer(_connectionContext, Protocol, _statefulReconnectBufferSize);
+                                    _messageBuffer = new MessageBuffer(_connectionContext, Protocol, _statefulReconnectBufferSize, _timeProvider);
                                     feature.OnReconnected(_messageBuffer.ResendAsync);
                                 }
 #pragma warning restore CA2252 // This API requires opting into preview features
@@ -775,12 +775,14 @@ public partial class HubConnectionContext
         _streamTracker?.CompleteAll(new OperationCanceledException("The underlying connection was closed."));
     }
 
-    internal void Ack(AckMessage ackMessage)
+    internal Task Ack(AckMessage ackMessage)
     {
         if (UsingStatefulReconnect())
         {
-            _messageBuffer.Ack(ackMessage);
+            return _messageBuffer.AckAsync(ackMessage);
         }
+
+        return Task.CompletedTask;
     }
 
     internal bool ShouldProcessMessage(HubMessage message)
