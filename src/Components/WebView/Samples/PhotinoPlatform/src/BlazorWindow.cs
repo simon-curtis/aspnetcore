@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Diagnostics;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.FileProviders;
 using PhotinoNET;
@@ -67,13 +68,111 @@ public class BlazorWindow
     /// </summary>
     public BlazorWindowRootComponents RootComponents { get; }
 
+    private string _latestControlDivValue;
+
     /// <summary>
     /// Shows the window and waits for it to be closed.
     /// </summary>
-    public void Run()
+    public void Run(bool isTestMode)
     {
+        const string NewControlDivValueMessage = "wvt:NewControlDivValue";
+        var isWebViewReady = false;
+
+        if (isTestMode)
+        {
+            _window.RegisterWebMessageReceivedHandler((s, msg) =>
+            {
+                if (!msg.StartsWith("__bwv:", StringComparison.Ordinal))
+                {
+                    if (msg == "wvt:Started")
+                    {
+                        isWebViewReady = true;
+                    }
+                    else if (msg.StartsWith(NewControlDivValueMessage, StringComparison.Ordinal))
+                    {
+                        _latestControlDivValue = msg.Substring(NewControlDivValueMessage.Length + 1);
+                    }
+                    Debug.WriteLine(msg);
+                }
+            });
+        }
+
         _manager.Navigate(_pathBase);
+
+        if (isTestMode)
+        {
+            Task.Run(async () =>
+            {
+                // 1. Wait for WebView ready
+                Debug.WriteLine($"Waiting for WebView ready...");
+                var isWebViewReadyRetriesLeft = 5;
+                while (!isWebViewReady)
+                {
+                    Debug.WriteLine($"WebView not ready yet, waiting 1sec...");
+                    await Task.Delay(1000);
+                    isWebViewReadyRetriesLeft--;
+                    if (isWebViewReadyRetriesLeft == 0)
+                    {
+                        Debug.WriteLine($"WebView never became ready, failing the test...");
+                        // TODO: Fail the test
+                        return;
+                    }
+                }
+                Debug.WriteLine($"WebView is ready!");
+
+                // 2. Check TestPage starting state
+                if (!await WaitForControlDiv(controlValueToWaitFor: "0"))
+                {
+                    // TODO: Fail the test
+                    return;
+                }
+
+                // 3. Click a button
+                _window.SendWebMessage($"wvt:ClickButton:incrementButton");
+
+                // 4. Check TestPage is updated after button click
+                if (!await WaitForControlDiv(controlValueToWaitFor: "1"))
+                {
+                    // TODO: Fail the test
+                    return;
+                }
+
+                // 5. If we get here, it all worked!
+                Debug.WriteLine($"All tests passed!");
+
+                _window.Close();
+            });
+        }
+
         _window.WaitForClose();
+    }
+
+    const int MaxWaitTimes = 30;
+    const int WaitTimeInMS = 250;
+
+    public async Task<bool> WaitForControlDiv(string controlValueToWaitFor)
+    {
+
+        for (var i = 0; i < MaxWaitTimes; i++)
+        {
+            // Tell WebView to report the current controlDiv value (this is inside the loop because
+            // it's possible for this to execute before the WebView has finished processing previous
+            // C#-generated events, such as WebView button clicks).
+            Debug.WriteLine($"Asking WebView for current controlDiv value...");
+            _window.SendWebMessage($"wvt:GetControlDivValue");
+
+            // And wait for the value to appear
+            if (_latestControlDivValue == controlValueToWaitFor)
+            {
+                Debug.WriteLine($"WebView reported the expected controlDiv value of {controlValueToWaitFor}!");
+                return true;
+            }
+            Debug.WriteLine($"Waiting for controlDiv to have value '{controlValueToWaitFor}', but it's still '{_latestControlDivValue}', so waiting {WaitTimeInMS}ms.");
+            await Task.Delay(WaitTimeInMS);
+        }
+
+        Debug.WriteLine($"Waited {MaxWaitTimes * WaitTimeInMS}ms but couldn't get controlDiv to have value '{controlValueToWaitFor}' (last value is '{_latestControlDivValue}').");
+        return false;
     }
 
     private Stream HandleWebRequest(string url, out string contentType)

@@ -10,6 +10,10 @@
   <Import Project="..\..\..\..\WebView\src\buildTransitive\any\Microsoft.AspNetCore.Components.WebView.props" />
 
   <ItemGroup>
+    <None Include="Pages\TestPage.razor" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Microsoft.AspNetCore.Components.WebView.Photino.csproj" />
     <ProjectReference Include="..\..\..\..\..\test\testassets\BasicTestApp\BasicTestApp.csproj" />
   </ItemGroup>

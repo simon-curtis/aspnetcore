@@ -13,13 +13,18 @@ class Program
     [STAThread]
     static void Main(string[] args)
     {
+        // TODO: Get this from a command-line arg or something
+        var isTestMode = true;
+
+        var hostPage = isTestMode ? "wwwroot/webviewtesthost.html" : "wwwroot/webviewhost.html";
+
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddBlazorWebView();
         serviceCollection.AddSingleton<HttpClient>();
 
         var mainWindow = new BlazorWindow(
             title: "Hello, world!",
-            hostPage: "wwwroot/webviewhost.html",
+            hostPage: hostPage,
             services: serviceCollection.BuildServiceProvider(),
             pathBase: "/subdir"); // The content in BasicTestApp assumes this
 
@@ -28,12 +33,19 @@ class Program
             mainWindow.Photino.OpenAlertWindow("Fatal exception", error.ExceptionObject.ToString());
         };
 
-        mainWindow.RootComponents.Add<BasicTestApp.Index>("root");
-        mainWindow.RootComponents.RegisterForJavaScript<BasicTestApp.DynamicallyAddedRootComponent>("my-dynamic-root-component");
-        mainWindow.RootComponents.RegisterForJavaScript<BasicTestApp.JavaScriptRootComponentParameterTypes>(
-            "component-with-many-parameters",
-            javaScriptInitializer: "myJsRootComponentInitializers.testInitializer");
+        if (isTestMode)
+        {
+            mainWindow.RootComponents.Add<Pages.TestPage>("root");
+        }
+        else
+        {
+            mainWindow.RootComponents.Add<BasicTestApp.Index>("root");
+            mainWindow.RootComponents.RegisterForJavaScript<BasicTestApp.DynamicallyAddedRootComponent>("my-dynamic-root-component");
+            mainWindow.RootComponents.RegisterForJavaScript<BasicTestApp.JavaScriptRootComponentParameterTypes>(
+                "component-with-many-parameters",
+                javaScriptInitializer: "myJsRootComponentInitializers.testInitializer");
+        }
 
-        mainWindow.Run();
+        mainWindow.Run(isTestMode);
     }
 }
