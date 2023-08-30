@@ -4,7 +4,7 @@
 import { ComponentDescriptor, ComponentMarker, descriptorToMarker } from './ComponentDescriptorDiscovery';
 import { isRendererAttached, registerRendererAttachedListener, updateRootComponents } from '../Rendering/WebRendererInteropMethods';
 import { WebRendererId } from '../Rendering/WebRendererId';
-import { NavigationEnhancementCallbacks, isPerformingEnhancedPageLoad } from './NavigationEnhancement';
+import { isPerformingEnhancedPageLoad } from './NavigationEnhancement';
 import { DescriptorHandler } from '../Rendering/DomMerging/DomSync';
 import { disposeCircuit, hasStartedServer, isCircuitAvailable, startCircuit, startServer } from '../Boot.Server.Common';
 import { hasLoadedWebAssemblyPlatform, hasStartedLoadingWebAssemblyPlatform, hasStartedWebAssembly, loadWebAssemblyPlatformIfNotStarted, startWebAssembly, waitForBootConfigLoaded } from '../Boot.WebAssembly.Common';
@@ -39,7 +39,7 @@ type RootComponentInfo = {
   interactiveComponentId?: number;
 }
 
-export class WebRootComponentManager implements DescriptorHandler, NavigationEnhancementCallbacks, RootComponentManager<never> {
+export class WebRootComponentManager implements DescriptorHandler, RootComponentManager<never> {
   private readonly _rootComponents = new Set<RootComponentInfo>();
 
   private readonly _descriptors = new Set<ComponentDescriptor>();
@@ -65,16 +65,15 @@ export class WebRootComponentManager implements DescriptorHandler, NavigationEnh
     });
   }
 
-  // Implements NavigationEnhancementCallbacks.
-  public documentUpdated() {
-    this.rootComponentsMayRequireRefresh();
-  }
-
   // Implements RootComponentManager.
   public onAfterRenderBatch(browserRendererId: number): void {
     if (browserRendererId === WebRendererId.Server) {
       this.circuitMayHaveNoRootComponents();
     }
+  }
+
+  public onDocumentUpdated() {
+    this.rootComponentsMayRequireRefresh();
   }
 
   public registerComponent(descriptor: ComponentDescriptor) {
